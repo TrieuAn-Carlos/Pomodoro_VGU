@@ -3,12 +3,14 @@ import { useTimerStore } from '../store/timerStore'
 import { useDataStore } from '../store/dataStore'
 import { useAuthStore } from '../store/authStore'
 import TimerDisplay from '../components/TimerDisplay'
-import { AnimatePresence } from 'framer-motion'
+import { GlassCard } from '../components/ui/GlassCard'
+import { Button } from '../components/ui/Button'
+import { Play, Coffee, Brain, Moon, Volume2 } from 'lucide-react'
 
 export default function Timer() {
   const { 
-    timeLeft, isRunning, isPaused, subject, sessionId, 
-    startTimer, pauseTimer, stopTimer, setTimeLeft, setSessionId, setSubject 
+    timeLeft, isRunning, isPaused, subject, sessionId, mode, duration,
+    startTimer, pauseTimer, stopTimer, setTimeLeft, setSessionId, setSubject, setMode
   } = useTimerStore()
   
   const { subjects, fetchSubjects, addSession, updateSession } = useDataStore()
@@ -18,7 +20,7 @@ export default function Timer() {
 
   useEffect(() => {
     if (user && subjects.length === 0) fetchSubjects()
-  }, [user, fetchSubjects, subjects.length]) // Added dependencies
+  }, [user, subjects.length, fetchSubjects])
 
   const playNotificationSound = useCallback(() => {
     const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg')
@@ -30,13 +32,16 @@ export default function Timer() {
     if (sessionId) {
       await updateSession(sessionId, {
         end_time: new Date().toISOString(),
-        duration: 25 * 60,
+        duration: duration, // Use the full duration setting
         completed: true
       })
     }
     playNotificationSound()
-    alert('Session Completed! Great job!')
-  }, [sessionId, stopTimer, updateSession, playNotificationSound])
+    // Optional: Show a modal or toast here
+    if (window.confirm('Session Completed! Start a break?')) {
+        setMode('shortBreak')
+    }
+  }, [sessionId, stopTimer, updateSession, duration, playNotificationSound, setMode])
 
   useEffect(() => {
     let interval = null
@@ -51,7 +56,7 @@ export default function Timer() {
   }, [isRunning, timeLeft, setTimeLeft, handleComplete])
 
   const handleStart = async () => {
-    if (!selectedSubjectId) {
+    if (mode === 'focus' && !selectedSubjectId) {
       alert('Please select a subject first!')
       return
     }
@@ -59,14 +64,16 @@ export default function Timer() {
     if (!sessionId) {
       const newSession = await addSession({
         user_id: user.id,
-        subject_id: selectedSubjectId,
-        type: 'focus',
-        duration: 0,
+        subject_id: mode === 'focus' ? selectedSubjectId : null, // Breaks might not have subjects
+        type: mode,
+        duration: 0, // Placeholder until complete
         start_time: new Date().toISOString(),
         completed: false
       })
       setSessionId(newSession.id)
-      setSubject(subjects.find(s => s.id === selectedSubjectId))
+      if (mode === 'focus') {
+          setSubject(subjects.find(s => s.id === selectedSubjectId))
+      }
     }
     
     startTimer()
@@ -76,46 +83,85 @@ export default function Timer() {
     pauseTimer()
   }
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8">
-      <div className="w-full max-w-md">
-        <label className="block text-sm font-medium text-slate-400 mb-2">Select Subject</label>
-        <select
-          value={selectedSubjectId}
-          onChange={(e) => {
-            setSelectedSubjectId(e.target.value)
-            setSubject(subjects.find(s => s.id === e.target.value))
-          }}
-          disabled={isRunning || isPaused}
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all appearance-none cursor-pointer"
-        >
-          <option value="" disabled>Choose a subject...</option>
-          {subjects.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-      </div>
+  const handleReset = () => {
+      stopTimer()
+  }
 
-      <div className="relative">
-        <div className="absolute inset-0 bg-purple-500/20 blur-[100px] rounded-full animate-pulse" />
-        
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8 relative pb-20">
+
+      {/* Mode Switcher */}
+      <GlassCard className="flex items-center p-1.5 gap-1 rounded-full bg-secondary/50 backdrop-blur-md border-border/50">
+        <button
+            onClick={() => { setMode('focus'); handleReset() }}
+            className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
+                mode === 'focus' ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'text-muted-foreground hover:text-white hover:bg-white/5'
+            }`}
+        >
+            <Brain className="w-4 h-4" /> Focus
+        </button>
+        <button
+            onClick={() => { setMode('shortBreak'); handleReset() }}
+            className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
+                mode === 'shortBreak' ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/25' : 'text-muted-foreground hover:text-white hover:bg-white/5'
+            }`}
+        >
+            <Coffee className="w-4 h-4" /> Short Break
+        </button>
+        <button
+            onClick={() => { setMode('longBreak'); handleReset() }}
+            className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
+                mode === 'longBreak' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'text-muted-foreground hover:text-white hover:bg-white/5'
+            }`}
+        >
+            <Moon className="w-4 h-4" /> Long Break
+        </button>
+      </GlassCard>
+
+      {/* Main Timer */}
+      <div className="relative z-10">
         <TimerDisplay 
           timeLeft={timeLeft}
-          duration={25 * 60}
+          duration={duration}
           isRunning={isRunning}
+          mode={mode}
           onStart={handleStart}
           onPause={handlePause}
-          onReset={stopTimer}
-          subjectColor={subject?.color || '#6366f1'}
+          onReset={handleReset}
         />
       </div>
 
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-white">{subject ? subject.name : 'Ready to Focus?'}</h2>
-        <p className="text-slate-400">
-          {isRunning ? 'Keep going! You are doing great.' : 'Select a subject and start the timer.'}
-        </p>
+      {/* Subject Selector (Only for Focus Mode) */}
+      <div className={`w-full max-w-md transition-all duration-500 ${mode === 'focus' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+        <div className="relative">
+            <select
+            value={selectedSubjectId}
+            onChange={(e) => {
+                setSelectedSubjectId(e.target.value)
+                setSubject(subjects.find(s => s.id === e.target.value))
+            }}
+            disabled={isRunning || isPaused}
+            className="w-full bg-card/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all appearance-none cursor-pointer hover:border-primary/50"
+            >
+            <option value="" disabled>Select a subject to focus on...</option>
+            {subjects.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                <Volume2 className="w-4 h-4 opacity-50" />
+            </div>
+        </div>
+
+        {subjects.length === 0 && (
+             <p className="text-center text-xs text-muted-foreground mt-2">
+                 No subjects found. <a href="/subjects" className="text-primary hover:underline">Create one</a> first.
+             </p>
+        )}
       </div>
+
+      {/* Ambient Background Elements */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] -z-10 animate-pulse" />
     </div>
   )
 }
