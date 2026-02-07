@@ -1,153 +1,218 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect } from 'react'
 import { useDataStore } from '../store/dataStore'
 import { useAuthStore } from '../store/authStore'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { Clock, Calendar, Zap, Play } from 'lucide-react'
-import { format, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns'
+import { Clock, Calendar, Zap, Play, ChevronRight, Activity } from 'lucide-react'
+import { format } from 'date-fns'
 import { Link } from 'react-router-dom'
+import { GlassCard } from '../components/ui/GlassCard'
+import { Button } from '../components/ui/Button'
 
 export default function Dashboard() {
   const { user } = useAuthStore()
-  const { sessions, subjects, fetchSessions, fetchSubjects } = useDataStore()
-  const [stats, setStats] = useState({ today: 0, week: 0, streak: 0 })
+  const { stats, recentSessions, subjects, fetchDashboardStats, fetchRecentSessions, fetchSubjects } = useDataStore()
 
   useEffect(() => {
     if (user) {
-      fetchSessions()
+      fetchDashboardStats()
+      fetchRecentSessions()
       fetchSubjects()
     }
   }, [user])
 
-  useEffect(() => {
-    if (sessions.length >= 0) {
-      const today = new Date()
-      const todaySessions = sessions.filter(s => isSameDay(parseISO(s.start_time), today))
-      const todayMinutes = todaySessions.reduce((acc, s) => acc + (s.duration || 0) / 60, 0)
-
-      const start = startOfWeek(today)
-      const end = endOfWeek(today)
-      const weekSessions = sessions.filter(s => {
-        const d = parseISO(s.start_time)
-        return d >= start && d <= end
-      })
-      const weekMinutes = weekSessions.reduce((acc, s) => acc + (s.duration || 0) / 60, 0)
-
-      setStats({
-        today: Math.round(todayMinutes),
-        week: Math.round(weekMinutes),
-        streak: 3 // Mock streak
-      })
-    }
-  }, [sessions])
-
-  const chartData = useMemo(() => [
-    { name: 'Mon', minutes: 120 },
-    { name: 'Tue', minutes: 90 },
-    { name: 'Wed', minutes: stats.today },
-    { name: 'Thu', minutes: 0 },
-    { name: 'Fri', minutes: 0 },
-    { name: 'Sat', minutes: 0 },
-    { name: 'Sun', minutes: 0 },
-  ], [stats.today])
+  const greeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good Morning'
+    if (hour < 18) return 'Good Afternoon'
+    return 'Good Evening'
+  }
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8 pb-10">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Dashboard</h1>
-          <p className="text-slate-400">Welcome back, {user?.user_metadata?.full_name || 'Student'}</p>
+          <h1 className="text-4xl font-bold tracking-tight text-white mb-1">
+            {greeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">{user?.user_metadata?.full_name?.split(' ')[0] || 'Scholar'}</span>
+          </h1>
+          <p className="text-muted-foreground text-lg">Ready to make progress today?</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
-          <Calendar className="w-4 h-4" />
-          <span>{format(new Date(), 'EEEE, MMMM do')}</span>
-        </div>
+        <GlassCard className="flex items-center gap-3 px-4 py-2 bg-card/40 border-primary/20">
+          <Calendar className="w-5 h-5 text-primary" />
+          <span className="text-sm font-medium text-foreground">{format(new Date(), 'EEEE, MMMM do')}</span>
+        </GlassCard>
       </div>
 
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-purple-500/30 transition-colors">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-3 bg-purple-500/20 text-purple-400 rounded-xl">
+        <GlassCard hoverEffect className="p-6 flex flex-col justify-between h-40 group">
+          <div className="flex justify-between items-start">
+            <div className="p-3 bg-primary/10 rounded-xl text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-300">
               <Clock className="w-6 h-6" />
             </div>
-            <h3 className="text-slate-400 font-medium">Today's Focus</h3>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Today's Focus</span>
           </div>
-          <p className="text-4xl font-bold text-white mt-2">{stats.today}<span className="text-lg text-slate-500 font-normal ml-1">min</span></p>
-        </div>
+          <div>
+            <div className="text-4xl font-bold text-white tracking-tight">
+              {stats.today}<span className="text-lg text-muted-foreground ml-1 font-medium">min</span>
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">
+               {stats.today > 0 ? 'Great start!' : 'Start your first session'}
+            </div>
+          </div>
+        </GlassCard>
 
-        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-cyan-500/30 transition-colors">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-3 bg-cyan-500/20 text-cyan-400 rounded-xl">
+        <GlassCard hoverEffect className="p-6 flex flex-col justify-between h-40 group">
+          <div className="flex justify-between items-start">
+            <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors duration-300">
               <Zap className="w-6 h-6" />
             </div>
-            <h3 className="text-slate-400 font-medium">Weekly Total</h3>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Current Streak</span>
           </div>
-          <p className="text-4xl font-bold text-white mt-2">{Math.round(stats.week / 60)}<span className="text-lg text-slate-500 font-normal ml-1">hrs</span></p>
-        </div>
-
-        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-orange-500/30 transition-colors">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-3 bg-orange-500/20 text-orange-400 rounded-xl">
-              <Calendar className="w-6 h-6" />
+          <div>
+            <div className="text-4xl font-bold text-white tracking-tight">
+              {stats.streak}<span className="text-lg text-muted-foreground ml-1 font-medium">days</span>
             </div>
-            <h3 className="text-slate-400 font-medium">Streak</h3>
+            <div className="text-sm text-muted-foreground mt-1">
+              Consistency is key
+            </div>
           </div>
-          <p className="text-4xl font-bold text-white mt-2">{stats.streak}<span className="text-lg text-slate-500 font-normal ml-1">days</span></p>
-        </div>
+        </GlassCard>
+
+        <GlassCard hoverEffect className="p-6 flex flex-col justify-between h-40 group">
+          <div className="flex justify-between items-start">
+            <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-300">
+              <Activity className="w-6 h-6" />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Weekly Total</span>
+          </div>
+          <div>
+            <div className="text-4xl font-bold text-white tracking-tight">
+              {Math.round(stats.week / 60)}<span className="text-lg text-muted-foreground ml-1 font-medium">hrs</span>
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">
+              {stats.week % 60} minutes
+            </div>
+          </div>
+        </GlassCard>
       </div>
 
+      {/* Main Content Area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl">
-          <h3 className="text-xl font-bold text-white mb-6">Activity Overview</h3>
-          <div className="h-64 w-full">
+        {/* Chart Section */}
+        <GlassCard className="lg:col-span-2 p-8 min-h-[400px]">
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-xl font-bold text-white">Activity Overview</h3>
+            <select className="bg-secondary text-sm rounded-lg px-3 py-1 outline-none border border-white/5">
+              <option>This Week</option>
+            </select>
+          </div>
+          <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}m`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
-                  cursor={{ fill: '#334155', opacity: 0.4 }}
+              <BarChart data={stats.dailyActivity}>
+                <XAxis
+                  dataKey="name"
+                  stroke="#52525b"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  dy={10}
                 />
-                <Bar dataKey="minutes" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={index} fill={index === 2 ? '#8b5cf6' : '#334155'} />
+                <YAxis
+                  stroke="#52525b"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${value}m`}
+                />
+                <Tooltip 
+                  cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-popover border border-border p-3 rounded-xl shadow-xl">
+                          <p className="text-foreground font-medium mb-1">{payload[0].payload.name}</p>
+                          <p className="text-primary text-sm font-bold">
+                            {payload[0].value} minutes
+                          </p>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Bar dataKey="minutes" radius={[6, 6, 6, 6]} barSize={40}>
+                  {stats.dailyActivity?.map((entry, index) => (
+                    <Cell
+                      key={index}
+                      fill={entry.minutes > 0 ? 'hsl(var(--primary))' : 'hsl(var(--muted))'}
+                      className="transition-all duration-300 hover:opacity-80"
+                    />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </GlassCard>
 
-        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl flex flex-col">
-          <h3 className="text-xl font-bold text-white mb-4">Quick Start</h3>
-          
-          <div className="space-y-3 flex-1">
-            {subjects.slice(0, 3).map(subject => (
-               <Link to="/timer" key={subject.id} className="block group">
-                 <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/50 border border-transparent hover:border-slate-700 transition-all">
-                   <div className="flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: subject.color }}>
-                       {subject.name.charAt(0)}
-                     </div>
-                     <span className="text-slate-300 group-hover:text-white font-medium">{subject.name}</span>
-                   </div>
-                   <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-cyan-400 group-hover:bg-cyan-500/10 transition-colors">
-                     <Play className="w-4 h-4 fill-current" />
-                   </div>
-                 </div>
-               </Link>
-            ))}
-            
-            {subjects.length === 0 && (
-              <div className="text-center py-8 text-slate-500">
-                No subjects yet.
-                <Link to="/subjects" className="text-cyan-400 hover:underline ml-1">Add one</Link>
-              </div>
-            )}
-          </div>
+        {/* Sidebar: Recent & Quick Start */}
+        <div className="space-y-6">
+            {/* Quick Start Card */}
+            <GlassCard className="p-6 bg-gradient-to-br from-primary/20 via-card/60 to-card/60 border-primary/20">
+                <h3 className="text-lg font-bold text-white mb-4">Quick Focus</h3>
+                <p className="text-muted-foreground text-sm mb-6">Pick a subject and start a 25m session instantly.</p>
+
+                <div className="space-y-3">
+                    {subjects.slice(0, 3).map(subject => (
+                        <Link to="/timer" key={subject.id} className="block">
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-card/50 hover:bg-primary/20 border border-white/5 hover:border-primary/30 transition-all group cursor-pointer">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: subject.color }} />
+                                    <span className="text-sm font-medium text-foreground group-hover:text-white">{subject.name}</span>
+                                </div>
+                                <Play className="w-3 h-3 text-muted-foreground group-hover:text-primary" />
+                            </div>
+                        </Link>
+                    ))}
+                    <Link to="/timer">
+                        <Button className="w-full mt-4" variant="primary">
+                            Open Timer <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                    </Link>
+                </div>
+            </GlassCard>
+
+            {/* Recent Activity List */}
+            <GlassCard className="p-6 h-auto">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-white">Recent Activity</h3>
+                </div>
+
+                <div className="space-y-4">
+                    {recentSessions.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                            No recent activity.
+                        </div>
+                    ) : (
+                        recentSessions.slice(0, 5).map((session) => (
+                            <div key={session.id} className="flex items-center justify-between group">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-colors">
+                                        {session.type === 'focus' ? <Clock className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-foreground">{session.subjects?.name || 'Unknown Subject'}</p>
+                                        <p className="text-xs text-muted-foreground">{format(new Date(session.start_time), 'MMM d, h:mm a')}</p>
+                                    </div>
+                                </div>
+                                <div className="text-sm font-medium text-white">
+                                    {Math.round(session.duration / 60)}m
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </GlassCard>
         </div>
       </div>
     </div>
